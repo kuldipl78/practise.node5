@@ -27,22 +27,29 @@ initilizationDBServer()
 
 app.post('/register', async (request, response) => {
   const {username, name, password, gender, location} = request.body
-  const selectDBQuery = `SELECT * FROM user WHERE username = ${username}`
-  const getUsernameFromDb = await db.get(selectDBQuery)
-  const lengthOfPass = password.length
-  if (getUsernameFromDb !== undefined) {
-    response.status(400)
-    response.send('User already exists')
-  } else if (lengthOfPass < 5) {
-    response.status(400)
-    response.send('Password is too short')
-  } else {
-    const hashedPassword = await bcrypt.hash(request.body.password, 10)
-    const postQuery = `INSERT INTO user (username, name, password, gender, location)
-            VALUES ('${username}', '${name}', '${hashedPassword}', '${gender}', '${location}')`
-    const dbResponse = await db.run(postQuery)
-    const newUserId = dbResponse.lastID
-    response.status(200)
-    response.send('User created successfully')
+
+  const selectDBQuery = `SELECT * FROM user WHERE username = ?`
+  const getUsernameFromDb = await db.get(selectDBQuery, [username])
+
+  if (getUsernameFromDb) {
+    return response.status(400).send('User already exists')
+  }
+  if (password.length < 5) {
+    return response.status(400).send('Password is too short')
+  }
+  const hashedPassword = await bcrypt.hash(request.body.password, 10)
+  const postQuery = `INSERT INTO user (username, name, password, gender, location)
+      VALUES (?, ?, ?, ?, ?)`
+  try {
+    const dbResponse = await db.run(postQuery, [
+      username,
+      name,
+      hashedPassword,
+      gender,
+      location,
+    ])
+    return response.status(200).send('User created successfully')
+  } catch (error) {
+    return response.send(`DB Error: ${error.message}`)
   }
 })
